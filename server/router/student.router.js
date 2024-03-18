@@ -114,7 +114,7 @@ router.post(
       }
 
       const newStudent = new studentModel({
-        id: generateID(),
+        id: existingID,
         batch: req.body.batch,
         name: req.body.name,
         gender: req.body.gender,
