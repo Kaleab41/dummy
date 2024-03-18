@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
 
-const newSchema = new mongoose.Schema({
+const studentSchema = new mongoose.Schema({
   id: String,
   batch: String,
   name: String,
@@ -10,19 +10,24 @@ const newSchema = new mongoose.Schema({
     type: String,
     default: null,
   },
-  phone: Number,
+  phone: String, // Changed to String for better handling of phone numbers
   guardianPhone: String,
   guardianName: String,
   department: String,
   aboutYou: String,
-  academicRecord: String,
+  academicRecord: {
+    data: Buffer, // Changed to lowercase for Buffer type
+    contentType: {
+      type: String,
+      default: "application/octet-stream", // Default MIME type
+    },
+  },
   restricted: {
-    default: true,
     type: Boolean,
+    default: true,
   },
   notifications: [
     {
-
       sender: String,
       message: String,
       file: String,
@@ -34,4 +39,4 @@ const newSchema = new mongoose.Schema({
   ],
 });
 
-module.exports = mongoose.model("student", newSchema);
+module.exports = mongoose.model("Student", studentSchema); // Changed model name to uppercase convention

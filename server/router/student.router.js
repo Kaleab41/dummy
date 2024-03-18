@@ -82,70 +82,65 @@ const uploadpayment = multer({
   limits: { fileSize: 5 * 1024 * 1024 }, // Limit file size to 5MB
 });
 
-// Handle POST request to register a new student with file upload for academic record
-router.post("/register", (req, res) => {
-  // Check if the provided email already exists
-  studentModel
-    .findOne({ email: req.body.email })
-    .then((existingEmail) => {
+const storage = multer.memoryStorage(); // Store files in memory
+const uploading = multer({ storage: storage });
+
+// POST route to register a new student with academic record file upload
+router.post(
+  "/register",
+  uploading.single("academicRecord"),
+  async (req, res) => {
+    try {
+      // Check if the provided email already exists
+      const existingEmail = await studentModel.findOne({
+        email: req.body.email,
+      });
       if (existingEmail) {
-        // Email already exists
         return res.status(409).json({ error: "Email already exists" });
-      } else {
-        // Check if the provided ID already exists
-        studentModel
-          .findOne({ id: generateID() })
-          .then((existingID) => {
-            if (existingID) {
-              // ID already exists
-              return res.status(409).json({ error: "ID already exists" });
-            } else {
-              // Both email and ID are unique, perform file upload
-              upload.single("academicRecord")(req, res, (err) => {
-                if (err) {
-                  // Error during file upload
-                  console.error(err);
-                  return res.status(500).json({ error: "File upload error" });
-                }
-
-                // File uploaded successfully, create and save the new student
-                const newStudent = new studentModel({
-                  id: generateID(), // Use provided ID
-                  batch: generateBatch(),
-                  name: req.body.name,
-                  gender: req.body.gender,
-                  email: req.body.email,
-                  phone: req.body.phone,
-                  guardianName: req.body.guardianName,
-                  guardianPhone: req.body.guardianPhone,
-                  department: req.body.department,
-                  aboutYou: req.body.aboutYou,
-                  academicRecord: req.file ? req.file.filename : null, // Save filename if file is uploaded
-                });
-
-                newStudent
-                  .save()
-                  .then((savedStudent) => {
-                    res.status(201).json(savedStudent);
-                  })
-                  .catch((err) => {
-                    console.error(err);
-                    res.status(500).json({ error: "Internal server error" });
-                  });
-              });
-            }
-          })
-          .catch((err) => {
-            console.error(err);
-            res.status(500).json({ error: "Internal server error" });
-          });
       }
-    })
-    .catch((err) => {
-      console.error(err);
-      res.status(500).json({ error: "Internal server error" });
-    });
-});
+
+      // Check if the provided ID already exists
+      const existingID = await studentModel.findOne({ id: generateID() });
+      if (existingID) {
+        return res.status(409).json({ error: "ID already exists" });
+      }
+
+      // Save academic record file to MongoDB
+      const academicRecordFile = req.file;
+      if (!academicRecordFile) {
+        return res
+          .status(400)
+          .json({ error: "No academic record file uploaded" });
+      }
+
+      const newStudent = new studentModel({
+        id: generateID(),
+        batch: req.body.batch,
+        name: req.body.name,
+        gender: req.body.gender,
+        email: req.body.email,
+        password: req.body.password,
+        phone: req.body.phone,
+        guardianPhone: req.body.guardianPhone,
+        guardianName: req.body.guardianName,
+        department: req.body.department,
+        aboutYou: req.body.aboutYou,
+        academicRecord: {
+          data: academicRecordFile.buffer, // Store file buffer as binary data
+          contentType: academicRecordFile.mimetype, // Set MIME type
+        },
+      });
+
+      // Save the new student to the database
+      await newStudent.save();
+
+      return res.status(201).json(newStudent);
+    } catch (error) {
+      console.error("Error during registration:", error);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  }
+);
 
 //TODO: Make sure to add frontend comparison of password and confirmation
 router.post("/signup", async (req, res) => {
@@ -154,17 +149,27 @@ router.post("/signup", async (req, res) => {
     const restriction = req.body.restriction;
     const hashedPassword = getHashedPassword(req.body.password);
 
-    const result = await studentModel.findOneAndUpdate(
-      { id: id },
-      { password: hashedPassword }
-    );
-
-    if (!result) {
+    // Find the student by ID and fetch the academic record
+    const student = await studentModel.findOne({ id: id });
+    if (!student) {
       return res.status(404).json({ error: "User doesn't exist!" });
     }
-    //FIXME: check wether student is restricted or not
 
-    return res.status(201).json({ message: "User Signup completed" });
+    // Check whether student is restricted or not
+    if (student.restricted && restriction) {
+      return res.status(403).json({ error: "Access restricted" });
+    }
+
+    // Check if academic record exists
+    if (!student.academicRecord || !student.academicRecord.data) {
+      return res.status(404).json({ error: "Academic record not found" });
+    }
+
+    // Set appropriate content type for the response
+    res.contentType(student.academicRecord.contentType);
+
+    // Send the binary data as response
+    res.send(student.academicRecord.data);
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: err.message });
