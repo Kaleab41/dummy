@@ -100,7 +100,7 @@ router.post(
       }
 
       // Check if the provided ID already exists
-      const existingID = await studentModel.findOne({ id: generateID() });
+      const existingID = await studentModel.findOne({ id: "AB2132" });
       if (existingID) {
         return res.status(409).json({ error: "ID already exists" });
       }
@@ -114,7 +114,7 @@ router.post(
       }
 
       const newStudent = new studentModel({
-        id: existingID,
+        id: "Ab3444",
         batch: req.body.batch,
         name: req.body.name,
         gender: req.body.gender,
